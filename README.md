@@ -18,7 +18,7 @@ Requisitos
 
 Clona este repositorio:
 
-  git clone https://github.com/tu-usuario/mi_proyecto_django.git
+  git clone https://github.com/tu-usuario/Formulario.git
 
   cd mi_proyecto_django
 
