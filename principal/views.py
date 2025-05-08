@@ -2,35 +2,18 @@ from django.shortcuts import render
 from .forms import FiareForm
 from django.http import HttpResponse
 from io import BytesIO
-from reportlab.pdfgen import canvas
+
 from reportlab.lib.pagesizes import A4
-from reportlab.pdfbase.pdfmetrics import stringWidth
-
-def draw_wrapped_text(canvas, text, x, y, max_width, line_height=15, font_name="Helvetica", font_size=10):
-    canvas.setFont(font_name, font_size)
-    words = text.split()
-    lines = []
-    current_line = ""
-
-    for word in words:
-        test_line = f"{current_line} {word}".strip()
-        if stringWidth(test_line, font_name, font_size) <= max_width:
-            current_line = test_line
-        else:
-            lines.append(current_line)
-            current_line = word
-
-    if current_line:
-        lines.append(current_line)
-
-    for line in lines:
-        canvas.drawString(x, y, line)
-        y -= line_height
+from reportlab.platypus import Paragraph, Spacer, Table, TableStyle, SimpleDocTemplate
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.enums import TA_JUSTIFY
+from reportlab.lib import colors
 
 def formulario(request):
     if request.method == 'POST':
         form = FiareForm(request.POST)
         if form.is_valid():
+            # Obtener datos del formulario
             nombre_secretario = form.cleaned_data['nombre_secretario']
             apellidos_secretario = form.cleaned_data['apellidos_secretario']
             NIF_secretario = form.cleaned_data['NIF_secretario']
@@ -43,38 +26,84 @@ def formulario(request):
             anno = form.cleaned_data['anno_reunion']
             nombre_presidente = form.cleaned_data['nombre_presidente']
             apellidos_presidente = form.cleaned_data['apellidos_presidente']
+            cantidad_acciones = form.cleaned_data['cantidad_acciones']
+            importe_acciones = form.cleaned_data['importe_acciones']
+            nombre_accionista = form.cleaned_data['nombre_accionista']
+            apellidos_accionista = form.cleaned_data['apellidos_accionista']
+            NIF_accionista = form.cleaned_data['NIF_accionista']
+            ciudad_reunion = form.cleaned_data['ciudad_reunion']
 
-            # Fecha compuesta
             fecha = f"{dia:02d}/{mes:02d}/{anno}"
 
-
+            # Crear el PDF
             buffer = BytesIO()
-            p = canvas.Canvas(buffer,pagesize=A4)
+            doc = SimpleDocTemplate(buffer, pagesize=A4)
 
-            parrafo1 = f"D. {nombre_secretario} {apellidos_secretario}, con NIF {NIF_secretario}, en calidad de Secretario de la Asociación {nombre_asociacion}, con CIF {CIF_asociacion} y domicilio en {domicilio_asoc}, inscrita en el Registro General de Asociaciones del País Vasco con número de registro {numero_registro}"
-            
-            parrafo2= f"CERTIFICO"
-            
-            parrafo3= f"Que en la Asamblea General Ordinaria (extraordinaria), en su reunión del {fecha}, en el domicilio social, y actuando como Presidente y Secretario D/Dña. {nombre_presidente} {apellidos_presidente} y D/Dña. {nombre_secretario} {apellidos_secretario} respectivamente, cumplidos los requisitos estatutarios y legales, se adoptaron, entre otros los siguientes acuerdos:"
+            styles = getSampleStyleSheet()
+            estilo_justificado = ParagraphStyle(
+                name="Justificado",
+                parent=styles["Normal"],
+                alignment=TA_JUSTIFY,
+                fontName="Helvetica",
+                fontSize=10,
+                leading=14
+            )
+            estilo_negrita = ParagraphStyle(
+                name="Negrita",
+                parent=styles["Normal"],
+                alignment=TA_JUSTIFY,
+                fontName="Helvetica-Bold",
+                fontSize=10,
+                leading=14
+            )
 
+            contenido = []
 
-            
-            y=800
-            draw_wrapped_text(p,parrafo1, x=100, y=y, max_width=450)
-            y-=60
-            draw_wrapped_text(p,parrafo2, x=100, y=y, max_width=450)
-            y-=60
-            draw_wrapped_text(p,parrafo3, x=100, y=y, max_width=450)
+            parrafos = [
+                f"D. {nombre_secretario} {apellidos_secretario}, con NIF {NIF_secretario}, en calidad de Secretario de la Asociación {nombre_asociacion}, con CIF {CIF_asociacion} y domicilio en {domicilio_asoc}, inscrita en el Registro General de Asociaciones del País Vasco con número de registro {numero_registro}.",
+                "CERTIFICO:",
+                f"Que en la Asamblea General Ordinaria (extraordinaria), en su reunión del {fecha}, en el domicilio social, y actuando como Presidente y Secretario D/Dña. {nombre_presidente} {apellidos_presidente} y D/Dña. {nombre_secretario} {apellidos_secretario} respectivamente, cumplidos los requisitos estatutarios y legales, se adoptaron, entre otros los siguientes acuerdos:",
+                f"PRIMERO: Se aprueba la decisión de comprar {cantidad_acciones} acciones de Banca Popolare Etica S.C.P.A. Sucursal España por importe de {importe_acciones} euros.",
+                f"SEGUNDO: Otorgar poder tanto amplio como sea posible a D. {nombre_accionista} {apellidos_accionista} con NIF {NIF_accionista} para representar de forma solidaria a esta asociación, para realizar todos los trámites necesarios y formalizar la compra de acciones aprobada en Asamblea General.",
+                "TERCERO: La vigencia de esta autorización se extenderá desde la fecha de emisión de este documento, hasta la fecha en la que sea revocada.",
+                f"Y para que así conste y surta los efectos que proceda, se extiende el presente en {ciudad_reunion} el día {fecha}."
+            ]
 
-            p.showPage()
-            p.save()
+            for texto in parrafos:
+                if texto == "CERTIFICO:":
+                    contenido.append(Paragraph(texto, estilo_negrita))
+                else:
+                    contenido.append(Paragraph(texto, estilo_justificado))
+                contenido.append(Spacer(1, 12))
 
+            # Espacios antes de tabla
+            contenido.append(Spacer(1, 24))
+            contenido.append(Spacer(1, 24))
+
+            # Tabla con nombres centrados y línea
+            tabla_firmas = Table([
+                ["PRESIDENTE", "SECRETARIO"],
+                [f"D./Dña. {nombre_presidente} {apellidos_presidente}", f"D./Dña. {nombre_secretario} {apellidos_secretario}"]
+            ], colWidths=[250, 250])
+
+            tabla_firmas.setStyle(TableStyle([
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('LINEBELOW', (0, 1), (-1, 1), 0.25, colors.white),
+                ('TOPPADDING', (0, 0), (-1, -1), 12),
+            ]))
+
+            contenido.append(tabla_firmas)
+
+            # Generar el PDF
+            doc.build(contenido)
             buffer.seek(0)
-            response = HttpResponse(buffer,content_type='application/pdf')
-            response['Content-Disposition'] = 'attachment; filename="certificado.pdf"'
-            return response
+
+            return HttpResponse(buffer, content_type='application/pdf', headers={
+                'Content-Disposition': 'attachment; filename="certificado.pdf"'
+            })
+
     else:
         form = FiareForm()
 
     return render(request, 'ModeloCertif.html', {'form': form})
-
