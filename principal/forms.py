@@ -20,5 +20,8 @@ class FiareForm(forms.Form):
     anno_reunion = forms.IntegerField(label='Año de la reunión', min_value=1900, max_value=2100)
     ciudad_reunion = forms.CharField(label='Ciudad de la reunión', max_length=100)
     
-    
+    def __init__(self, *args, **kwargs):
+        super(FiareForm, self).__init__(*args, **kwargs)
+        for visible in self.visible_fields():
+            visible.field.widget.attrs['class'] = 'form-control'
 
