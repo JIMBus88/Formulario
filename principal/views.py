@@ -99,8 +99,46 @@ def formulario(request):
             doc.build(contenido)
             buffer.seek(0)
 
-            return HttpResponse(buffer, content_type='application/pdf', headers={
-                'Content-Disposition': 'attachment; filename="certificado.pdf"'
+            # Añadir metadatos JSON al PDF usando pikepdf
+            import pikepdf
+            import json
+
+            # Diccionario con los datos del formulario
+            metadatos_json = {
+                "nombre_secretario": nombre_secretario,
+                "apellidos_secretario": apellidos_secretario,
+                "NIF_secretario": NIF_secretario,
+                "nombre_asociacion": nombre_asociacion,
+                "CIF_asociacion": CIF_asociacion,
+                "domicilio_asoc": domicilio_asoc,
+                "numero_registro": numero_registro,
+                "fecha_reunion": fecha,
+                "ciudad_reunion": ciudad_reunion,
+                "nombre_presidente": nombre_presidente,
+                "apellidos_presidente": apellidos_presidente,
+                "cantidad_acciones": cantidad_acciones,
+                "importe_acciones": importe_acciones,
+                "nombre_accionista": nombre_accionista,
+                "apellidos_accionista": apellidos_accionista,
+                "NIF_accionista": NIF_accionista
+            }
+
+            # Abrir el PDF generado con pikepdf desde el buffer
+            temp_pdf = BytesIO()
+            temp_pdf.write(buffer.getvalue())
+            temp_pdf.seek(0)
+
+            with pikepdf.open(temp_pdf) as pdf:
+                pdf.docinfo["/fiare_metadata"] = json.dumps(metadatos_json)
+                
+                final_buffer = BytesIO()
+                pdf.save(final_buffer)
+
+            final_buffer.seek(0)
+
+            # Devolver el PDF con metadatos al navegador
+            return HttpResponse(final_buffer, content_type='application/pdf', headers={
+                'Content-Disposition': 'attachment; filename="certificadometadatos.pdf"'
             })
 
     else:
